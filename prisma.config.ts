@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -7,7 +7,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
-    directUrl: env("DIRECT_URL"),
+    // Prisma CLI commands (migrations) should use the direct Neon URL when it
+    // is available. `prisma generate` does not connect, so an empty string is
+    // allowed there; runtime uses DATABASE_URL through the Neon adapter.
+    url: process.env.DIRECT_URL || process.env.DATABASE_URL || "",
   },
 });

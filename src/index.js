@@ -2,7 +2,7 @@ const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const express = require("express");
 const cors = require("cors");
-const { prisma } = require("./db");
+const { getPrisma } = require("./db");
 const authRoutes = require("./routes/auth");
 
 const app = express();
@@ -18,14 +18,25 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Root GET / (health/diagnostic when opened in a browser) ─
+app.get("/", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "Letter Crafts API",
+    databaseConfigured: Boolean(process.env.DATABASE_URL),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ── Root POST / (Used by Form.jsx via API.post("", form)) ───
 app.post("/", async (req, res) => {
   try {
-    const { name, email, password, message, phone } = req.body;
+    const { name, email, password, message, phone } = req.body || {};
     if (!name || !email) {
       return res.status(400).json({ error: "Name and email are required" });
     }
 
+    const prisma = getPrisma();
     const existing = await prisma.user.findUnique({ where: { email } });
     let user;
 
@@ -51,8 +62,9 @@ app.post("/", async (req, res) => {
       });
     }
 
+    const { password: _password, ...safeUser } = user;
     res.status(201).json({
-      ...user,
+      ...safeUser,
       id: user.id,
       _id: user.id,
       success: true,
@@ -68,11 +80,24 @@ app.post("/", async (req, res) => {
 app.use("/auth", authRoutes);
 
 // ── Health check ────────────────────────────────────────────
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// ── Start server ────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 Letter Crafts Backend running on http://localhost:${PORT}`);
+// ── Error handler (keeps the function alive and reports details) ──
+app.use((error, _req, res, _next) => {
+  console.error("Unhandled error:", error);
+  res.status(500).json({ error: "Internal server error" });
 });
+
+// ── Export for Vercel Functions ─────────────────────────────
+module.exports = app;
+
+// ── Start server for local development ──────────────────────
+// On Vercel the exported app is used directly; calling listen() there would
+// create a second server inside the function.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Letter Crafts Backend running on http://localhost:${PORT}`);
+  });
+}

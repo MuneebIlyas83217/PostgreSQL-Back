@@ -1,12 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const { prisma } = require("../db");
+const { getPrisma } = require("../db");
 
-// Helper to format user with both `id` and `_id`
+// Helper to format a user for API responses without leaking the password
 const formatUser = (user) => {
   if (!user) return null;
+  const { password: _password, ...safeUser } = user;
   return {
-    ...user,
+    ...safeUser,
     _id: user.id,
   };
 };
@@ -14,6 +15,7 @@ const formatUser = (user) => {
 // ── POST /auth/register (Used by Lastpage.jsx quote form & general registration) ──
 router.post("/register", async (req, res) => {
   try {
+    const prisma = getPrisma();
     const {
       name,
       email,
@@ -47,8 +49,8 @@ router.post("/register", async (req, res) => {
           toLanguage: toLanguage !== undefined ? toLanguage : existing.toLanguage,
           deliveryOptions: deliveryOptions !== undefined ? deliveryOptions : existing.deliveryOptions,
           message: message !== undefined ? message : existing.message,
-          urgentReq: Boolean(urgentReq),
-          notarization: Boolean(notarization),
+          urgentReq: urgentReq !== undefined ? Boolean(urgentReq) : existing.urgentReq,
+          notarization: notarization !== undefined ? Boolean(notarization) : existing.notarization,
           ...(password ? { password } : {}),
         },
       });
@@ -76,13 +78,14 @@ router.post("/register", async (req, res) => {
     });
   } catch (error) {
     console.error("Error in /auth/register:", error);
-    res.status(500).json({ error: error.message || "Failed to submit form" });
+    res.status(500).json({ error: "Failed to submit form" });
   }
 });
 
 // ── GET /auth/get-user (Used by GetUsers.jsx) ──
 router.get(["/get-user", "/get-users"], async (req, res) => {
   try {
+    const prisma = getPrisma();
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
     });
@@ -96,6 +99,7 @@ router.get(["/get-user", "/get-users"], async (req, res) => {
 // ── GET /auth/getuser/:id (Used by Update.jsx) ──
 router.get(["/getuser/:id", "/get-user/:id"], async (req, res) => {
   try {
+    const prisma = getPrisma();
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -119,6 +123,7 @@ router.get(["/getuser/:id", "/get-user/:id"], async (req, res) => {
 // ── PUT /auth/update-user/:id (Used by Update.jsx) ──
 router.put("/update-user/:id", async (req, res) => {
   try {
+    const prisma = getPrisma();
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid user ID" });
@@ -134,11 +139,11 @@ router.put("/update-user/:id", async (req, res) => {
       deliveryOptions,
       urgentReq,
       notarization,
-    } = req.body;
+    } = req.body || {};
 
     const data = {};
     if (name !== undefined) data.name = name;
-    if (email !== undefined) data.email = email;
+    if (email !== undefined) data.email = typeof email === "string" ? email.trim().toLowerCase() : email;
     if (message !== undefined) data.message = message;
     if (phone !== undefined) data.phone = phone;
     if (sourceLanguage !== undefined) data.sourceLanguage = sourceLanguage;
@@ -161,6 +166,9 @@ router.put("/update-user/:id", async (req, res) => {
     if (error.code === "P2025") {
       return res.status(404).json({ error: "User not found" });
     }
+    if (error.code === "P2002") {
+      return res.status(409).json({ error: "A user with that email already exists" });
+    }
     res.status(500).json({ error: "Failed to update user" });
   }
 });
@@ -168,6 +176,7 @@ router.put("/update-user/:id", async (req, res) => {
 // ── DELETE /auth/delete-user/:id (Used by GetUsers.jsx) ──
 router.delete("/delete-user/:id", async (req, res) => {
   try {
+    const prisma = getPrisma();
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid user ID" });
