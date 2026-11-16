@@ -72,15 +72,16 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // Send confirmation email via nodemailer (non-blocking)
-    if (sourceLanguage || toLanguage || deliveryOptions) {
-      sendQuoteConfirmationEmail(user).catch((err) =>
-        console.error("[Mailer] Error sending quote confirmation:", err.message)
-      );
-    } else {
-      sendWelcomeEmail(user).catch((err) =>
-        console.error("[Mailer] Error sending welcome email:", err.message)
-      );
+    // Send confirmation email via nodemailer
+    // Awaited so serverless platforms (e.g. Vercel) complete the SMTP transmission before freezing
+    try {
+      if (sourceLanguage || toLanguage || deliveryOptions) {
+        await sendQuoteConfirmationEmail(user);
+      } else {
+        await sendWelcomeEmail(user);
+      }
+    } catch (err) {
+      console.error("[Mailer] Error sending email:", err.message);
     }
 
     res.status(201).json({

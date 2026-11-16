@@ -25,6 +25,7 @@ app.get("/", (_req, res) => {
     status: "ok",
     service: "Letter Crafts API",
     databaseConfigured: Boolean(process.env.DATABASE_URL),
+    emailConfigured: Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS),
     timestamp: new Date().toISOString(),
   });
 });
@@ -67,9 +68,12 @@ app.post("/", async (req, res) => {
     }
 
     // Send welcome email directly to the email entered by the user during registration
-    sendWelcomeEmail(user).catch((err) =>
-      console.error(`[Mailer] Error sending welcome email to ${cleanEmail}:`, err.message)
-    );
+    // We await it so serverless platforms (e.g. Vercel) keep the execution context alive until sent
+    try {
+      await sendWelcomeEmail(user);
+    } catch (err) {
+      console.error(`[Mailer] Error sending welcome email to ${cleanEmail}:`, err.message);
+    }
 
     const { password: _password, ...safeUser } = user;
     res.status(201).json({

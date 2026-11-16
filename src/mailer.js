@@ -1,13 +1,26 @@
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const nodemailer = require("nodemailer");
 
-// Create reusable transporter object using Gmail SMTP
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+/**
+ * Get or create the Nodemailer transporter lazily using environment variables
+ */
+function getTransporter() {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+
+  if (!user || !pass) {
+    console.warn(
+      "[Mailer] Warning: EMAIL_USER or EMAIL_PASS is not set in environment variables. Email will not be sent."
+    );
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+  });
+}
 
 /**
  * Send a welcome confirmation email when a user registers (e.g. from Form.jsx)
@@ -24,11 +37,16 @@ async function sendWelcomeEmail(user) {
     return;
   }
 
+  const transporter = getTransporter();
+  if (!transporter) return;
+
+  const senderEmail = process.env.EMAIL_USER;
+
   const mailOptions = {
-    from: `"Letter Crafts" <${process.env.EMAIL_USER}>`,
+    from: `"Letter Crafts" <${senderEmail}>`,
     to: recipientEmail, // Sent directly to the email entered by the user
     subject: `Welcome to Letter Crafts, ${user.name || "there"}!`,
-    text: `Hello ${user.name || "there"},\n\nThank you for registering with Letter Crafts! Your account has been successfully created.\n\nEmail: ${user.email}\n\nWe're excited to have you with us!\n\nBest regards,\nThe Letter Crafts Team`,
+    text: `Hello ${user.name || "there"},\n\nThank you for registering with Letter Crafts! Your account has been successfully created.\n\nEmail: ${recipientEmail}\n\nWe're excited to have you with us!\n\nBest regards,\nThe Letter Crafts Team`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
         <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #0189CF;">
@@ -45,7 +63,7 @@ async function sendWelcomeEmail(user) {
           <div style="background-color: #f7fafc; border-left: 4px solid #0189CF; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0; color: #333; font-size: 14px;"><strong>Account Details:</strong></p>
             <p style="margin: 6px 0 0 0; color: #555; font-size: 14px;"><strong>Name:</strong> ${user.name || "N/A"}</p>
-            <p style="margin: 4px 0 0 0; color: #555; font-size: 14px;"><strong>Email:</strong> ${user.email}</p>
+            <p style="margin: 4px 0 0 0; color: #555; font-size: 14px;"><strong>Email:</strong> ${recipientEmail}</p>
           </div>
 
           <p style="color: #555555; line-height: 1.6; font-size: 14px;">
@@ -63,10 +81,10 @@ async function sendWelcomeEmail(user) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[Mailer] Welcome email sent to ${user.email} (Message ID: ${info.messageId})`);
+    console.log(`[Mailer] Welcome email sent successfully to ${recipientEmail} (Message ID: ${info.messageId})`);
     return info;
   } catch (error) {
-    console.error(`[Mailer] Failed to send welcome email to ${user.email}:`, error.message);
+    console.error(`[Mailer] Failed to send welcome email to ${recipientEmail}:`, error.message);
   }
 }
 
@@ -85,8 +103,13 @@ async function sendQuoteConfirmationEmail(user) {
     return;
   }
 
+  const transporter = getTransporter();
+  if (!transporter) return;
+
+  const senderEmail = process.env.EMAIL_USER;
+
   const mailOptions = {
-    from: `"Letter Crafts" <${process.env.EMAIL_USER}>`,
+    from: `"Letter Crafts" <${senderEmail}>`,
     to: recipientEmail, // Sent directly to the email entered by the user
     subject: `We've Received Your Translation Quote Request - Letter Crafts`,
     text: `Hello ${user.name || "Valued Client"},\n\nThank you for requesting a quote from Letter Crafts! We have received your request and our team will get back to you within 30 minutes.\n\nSummary:\n- Source Language: ${user.sourceLanguage || "Not specified"}\n- Target Language: ${user.toLanguage || "Not specified"}\n- Delivery Option: ${user.deliveryOptions || "Standard"}\n\nBest regards,\nThe Letter Crafts Team`,
@@ -125,16 +148,15 @@ async function sendQuoteConfirmationEmail(user) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[Mailer] Quote confirmation sent to ${user.email} (Message ID: ${info.messageId})`);
+    console.log(`[Mailer] Quote confirmation sent successfully to ${recipientEmail} (Message ID: ${info.messageId})`);
     return info;
   } catch (error) {
-    console.error(`[Mailer] Failed to send quote confirmation to ${user.email}:`, error.message);
+    console.error(`[Mailer] Failed to send quote confirmation to ${recipientEmail}:`, error.message);
   }
 }
 
 module.exports = {
-  transporter,
+  getTransporter,
   sendWelcomeEmail,
   sendQuoteConfirmationEmail,
 };
-
