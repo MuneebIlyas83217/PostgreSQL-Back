@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const { getPrisma } = require("./db");
 const authRoutes = require("./routes/auth");
+const { sendWelcomeEmail } = require("./mailer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -61,6 +62,11 @@ app.post("/", async (req, res) => {
         },
       });
     }
+
+    // Send welcome email via nodemailer
+    sendWelcomeEmail(user).catch((err) =>
+      console.error("[Mailer] Error sending welcome email:", err.message)
+    );
 
     const { password: _password, ...safeUser } = user;
     res.status(201).json({

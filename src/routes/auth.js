@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { getPrisma } = require("../db");
+const { sendWelcomeEmail, sendQuoteConfirmationEmail } = require("../mailer");
 
 // Helper to format a user for API responses without leaking the password
 const formatUser = (user) => {
@@ -69,6 +70,17 @@ router.post("/register", async (req, res) => {
           notarization: Boolean(notarization),
         },
       });
+    }
+
+    // Send confirmation email via nodemailer (non-blocking)
+    if (sourceLanguage || toLanguage || deliveryOptions) {
+      sendQuoteConfirmationEmail(user).catch((err) =>
+        console.error("[Mailer] Error sending quote confirmation:", err.message)
+      );
+    } else {
+      sendWelcomeEmail(user).catch((err) =>
+        console.error("[Mailer] Error sending welcome email:", err.message)
+      );
     }
 
     res.status(201).json({
