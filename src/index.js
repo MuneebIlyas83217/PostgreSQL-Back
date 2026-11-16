@@ -37,15 +37,18 @@ app.post("/", async (req, res) => {
       return res.status(400).json({ error: "Name and email are required" });
     }
 
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanName = String(name).trim();
+
     const prisma = getPrisma();
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
     let user;
 
     if (existing) {
       user = await prisma.user.update({
-        where: { email },
+        where: { email: cleanEmail },
         data: {
-          name,
+          name: cleanName,
           ...(password ? { password } : {}),
           ...(message ? { message } : {}),
           ...(phone ? { phone } : {}),
@@ -54,8 +57,8 @@ app.post("/", async (req, res) => {
     } else {
       user = await prisma.user.create({
         data: {
-          name,
-          email,
+          name: cleanName,
+          email: cleanEmail,
           password: password || null,
           message: message || null,
           phone: phone || null,
@@ -63,9 +66,9 @@ app.post("/", async (req, res) => {
       });
     }
 
-    // Send welcome email via nodemailer
+    // Send welcome email directly to the email entered by the user during registration
     sendWelcomeEmail(user).catch((err) =>
-      console.error("[Mailer] Error sending welcome email:", err.message)
+      console.error(`[Mailer] Error sending welcome email to ${cleanEmail}:`, err.message)
     );
 
     const { password: _password, ...safeUser } = user;

@@ -16,9 +16,17 @@ const transporter = nodemailer.createTransport({
 async function sendWelcomeEmail(user) {
   if (!user || !user.email) return;
 
+  const recipientEmail = String(user.email).trim();
+
+  // Skip dummy/fallback placeholder emails
+  if (recipientEmail.endsWith("@lettercrafts.local") || recipientEmail.endsWith("@quote.local")) {
+    console.log(`[Mailer] Skipped sending welcome email to placeholder address: ${recipientEmail}`);
+    return;
+  }
+
   const mailOptions = {
     from: `"Letter Crafts" <${process.env.EMAIL_USER}>`,
-    to: user.email,
+    to: recipientEmail, // Sent directly to the email entered by the user
     subject: `Welcome to Letter Crafts, ${user.name || "there"}!`,
     text: `Hello ${user.name || "there"},\n\nThank you for registering with Letter Crafts! Your account has been successfully created.\n\nEmail: ${user.email}\n\nWe're excited to have you with us!\n\nBest regards,\nThe Letter Crafts Team`,
     html: `
@@ -69,14 +77,17 @@ async function sendWelcomeEmail(user) {
 async function sendQuoteConfirmationEmail(user) {
   if (!user || !user.email) return;
 
+  const recipientEmail = String(user.email).trim();
+
   // Skip dummy/fallback emails
-  if (user.email.endsWith("@lettercrafts.local") || user.email.endsWith("@quote.local")) {
+  if (recipientEmail.endsWith("@lettercrafts.local") || recipientEmail.endsWith("@quote.local")) {
+    console.log(`[Mailer] Skipped sending quote confirmation to placeholder address: ${recipientEmail}`);
     return;
   }
 
   const mailOptions = {
     from: `"Letter Crafts" <${process.env.EMAIL_USER}>`,
-    to: user.email,
+    to: recipientEmail, // Sent directly to the email entered by the user
     subject: `We've Received Your Translation Quote Request - Letter Crafts`,
     text: `Hello ${user.name || "Valued Client"},\n\nThank you for requesting a quote from Letter Crafts! We have received your request and our team will get back to you within 30 minutes.\n\nSummary:\n- Source Language: ${user.sourceLanguage || "Not specified"}\n- Target Language: ${user.toLanguage || "Not specified"}\n- Delivery Option: ${user.deliveryOptions || "Standard"}\n\nBest regards,\nThe Letter Crafts Team`,
     html: `
